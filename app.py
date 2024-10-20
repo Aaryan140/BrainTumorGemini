@@ -57,9 +57,7 @@ def detect_and_plot(image, model):
     
     return buf, detected_class
 
-# Function to get response from Gemini model
-
-# Function to autogenerate based on what type of tumor
+# Function to get response from Gemini model for tumor information
 def get_gemini_response(tumor_type):
     model = genai.GenerativeModel("gemini-pro")
     prompt = f"""Provide a brief overview of the {tumor_type} brain tumor. Include the following information:
@@ -72,11 +70,14 @@ def get_gemini_response(tumor_type):
     response = model.generate_content(prompt)
     return response.text.strip()
 
-# Function to handle user queries using gemini api
+# Function to handle user queries using Gemini API
 def get_gemini_response_for_query(user_query):
     model = genai.GenerativeModel("gemini-pro")
-    prompt = f"{user_query}"
-    
+    prompt = f"""You are a knowledgeable assistant specialized in brain tumors and related topics, including diagnoses, treatments, and brain health. You only provide answers related to brain tumors, the 'BRAINORMER' project, or closely related medical information. User's question: {user_query}
+            If the user's question is not related to brain tumors or relevant medical topics, politely respond with:
+            "I'm sorry, but I can only provide information about brain tumors, brain health, or related medical topics. Could you please ask a question in those areas?"
+            
+            Format your response with appropriate line breaks and use markdown formatting for better readability."""
     response = model.generate_content(prompt)
     return response.text.strip()
 
@@ -84,6 +85,13 @@ def get_gemini_response_for_query(user_query):
 st.set_page_config(page_title="Brain Tumor Detector", layout="centered")
 st.markdown("<h1 style='text-align: center; color: #FF0800;'>Brain Tumor Detector</h1>", unsafe_allow_html=True)
 
+# Initialize session state for chat visibility and history
+if 'chat_visible' not in st.session_state:
+    st.session_state.chat_visible = False
+if 'chat_history' not in st.session_state:
+    st.session_state.chat_history = []
+
+# Image upload and processing section
 st.subheader("Upload Image")
 uploaded_image = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
@@ -120,10 +128,42 @@ if uploaded_image is not None:
         else:
             st.subheader("No confident detection made. Please try with a clearer image.")
 
-# Add user query section
-st.subheader("Ask any query about brain tumors:")
-user_query = st.text_area("Enter your query here:")
+# Chat assistant section
+if st.session_state.chat_visible:
+    st.title("Brain Tumor Chat Assistant")
+    st.write("Ask me anything about brain tumors or related topics!")
 
-if user_query:
-    response = get_gemini_response_for_query(user_query)
-    st.markdown(response)
+    # Display chat history
+    for user_input, bot_response in st.session_state.chat_history:
+        st.markdown(f"**You:** {user_input}")
+        st.markdown(f"**Bot:** {bot_response}")
+        st.markdown("---")
+
+    # User input field for chat
+    user_input = st.text_input("Enter your query here:", key="chat_input")
+
+    # Process new user input for chat
+    if user_input:  # This will trigger on Enter key press
+        # Generate the bot's response based on the user's input
+        bot_response = get_gemini_response_for_query(user_input)
+
+        # Append the new query and response to the chat history
+        st.session_state.chat_history.append((user_input, bot_response))
+
+        # Display the new message immediately
+        st.markdown(f"**You:** {user_input}")
+        st.markdown(f"**Bot:** {bot_response}")
+        st.markdown("---")
+
+    # Add a button to clear chat history
+    if st.button("Clear Chat History"):
+        st.session_state.chat_history = []
+        st.session_state.chat_visible = False
+
+else:
+    # Button to start the chat
+    if st.button("Start Chat Assistant"):
+        st.session_state.chat_visible = True
+
+# Force a rerun of the script to update the UI
+st.empty()
